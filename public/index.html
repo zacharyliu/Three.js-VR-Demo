@@ -1,42 +1,285 @@
-<!DOCTYPE html>
-<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
-<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
-<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title></title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Camera Texture (Three.js)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style type="text/css">
+        body
+        {
+            background: black;
+            margin: 0px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
 
-        <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+<script src="/js/three/Three.js"></script>
+<script src="/js/three/Detector.js"></script>
+<script src="/js/three/Stats.js"></script>
+<script src="/js/three/OrbitControls.js"></script>
+<script src="/js/three/TrackballControls.js"></script>
+<script src="/js/three/THREEx.KeyboardState.js"></script>
+<script src="/js/three/THREEx.FullScreen.js"></script>
+<script src="/js/three/THREEx.WindowResize.js"></script>
 
-        <link rel="stylesheet" href="css/normalize.css">
-        <link rel="stylesheet" href="css/main.css">
-        <script src="js/vendor/modernizr-2.6.2.min.js"></script>
-    </head>
-    <body>
-        <!--[if lt IE 7]>
-            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
-        <![endif]-->
+<!-- ------------------------------------------------------------ -->
 
-        <!-- Add your site or application content here -->
-        <p>Hello world! This is HTML5 Boilerplate.</p>
+<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+<script>
+/*
+ Three.js "tutorials by example"
+ Author: Lee Stemkoski
+ Date: July 2013 (three.js v59dev)
+ */
 
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.10.2.min.js"><\/script>')</script>
-        <script src="js/plugins.js"></script>
-        <script src="js/main.js"></script>
+// MAIN
 
-        <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
-        <script>
-            (function(b,o,i,l,e,r){b.GoogleAnalyticsObject=l;b[l]||(b[l]=
-            function(){(b[l].q=b[l].q||[]).push(arguments)});b[l].l=+new Date;
-            e=o.createElement(i);r=o.getElementsByTagName(i)[0];
-            e.src='//www.google-analytics.com/analytics.js';
-            r.parentNode.insertBefore(e,r)}(window,document,'script','ga'));
-            ga('create','UA-XXXXX-X');ga('send','pageview');
-        </script>
-    </body>
+// standard global variables
+var container, scene, renderer, controls, stats;
+var keyboard = new THREEx.KeyboardState();
+var clock = new THREE.Clock();
+
+// custom global variables
+var MovingCube;
+var mainCamera;
+
+// intermediate scene for reflecting the reflection
+var screenScene, screenCamera, firstRenderTarget, finalRenderTarget;
+
+// sizing
+var hex_cameras = [];
+var hex_camera_targets = [];
+var hex_planes = [];
+var hex_render_targets = [];
+var HEX_PANEL_HEIGHT = 9 * 30;
+var HEX_PANEL_WIDTH = 6 * 30;
+
+var HEX_NUM_PIXELS = 1024 * 1024;
+
+init();
+animate();
+
+// FUNCTIONS
+function init()
+{
+    // SCENE
+    scene = new THREE.Scene();
+
+    // CAMERAS
+    var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+    var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 20000;
+    // camera 1
+    mainCamera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR );
+    scene.add(mainCamera);
+    mainCamera.position.set(0,200,0);
+//    mainCamera.lookAt(scene.position);
+
+    // RENDERER
+
+
+    if ( Detector.webgl )
+        renderer = new THREE.WebGLRenderer( {antialias:true} );
+    else
+        renderer = new THREE.CanvasRenderer();
+    renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    container = document.getElementById( 'ThreeJS' );
+    container.appendChild( renderer.domElement );
+
+    // EVENTS
+    THREEx.WindowResize(renderer, mainCamera);
+
+    // controls
+    controls = new THREE.OrbitControls( mainCamera, renderer.domElement );
+
+    // STATS
+    stats = new Stats();
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.bottom = '0px';
+    stats.domElement.style.zIndex = 100;
+    container.appendChild( stats.domElement );
+
+    // LIGHT
+    var light = new THREE.PointLight(0xffffff);
+    light.position.set(0,250,0);
+    scene.add(light);
+
+    // FLOOR
+    var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.repeat.set( 10, 10 );
+    var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.FrontSide } );
+    var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+    var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.position.y = -0.5;
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+    // SKYBOX/FOG
+    var materialArray = [];
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-xpos.png' ) }));
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-xneg.png' ) }));
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-ypos.png' ) }));
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-yneg.png' ) }));
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-zpos.png' ) }));
+    materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-zneg.png' ) }));
+    for (var i = 0; i < 6; i++)
+        materialArray[i].side = THREE.BackSide;
+    var skyboxMaterial = new THREE.MeshFaceMaterial( materialArray );
+
+    var skyboxGeom = new THREE.CubeGeometry( 5000, 5000, 5000, 1, 1, 1 );
+
+    var skybox = new THREE.Mesh( skyboxGeom, skyboxMaterial );
+    scene.add( skybox );
+
+    ////////////
+    // CUSTOM //
+    ////////////
+
+    // create an array with six textures for a cool cube
+    var cubeMaterialArray = [];
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/xpos.png' ) }));
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/xneg.png' ) }));
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/ypos.png' ) }));
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/yneg.png' ) }));
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/zpos.png' ) }));
+    cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/zneg.png' ) }));
+    var MovingCubeMat = new THREE.MeshFaceMaterial(cubeMaterialArray);
+    var MovingCubeGeom = new THREE.CubeGeometry( 50, 50, 50, 1, 1, 1, cubeMaterialArray );
+    MovingCube = new THREE.Mesh( MovingCubeGeom, MovingCubeMat );
+    MovingCube.position.set(0, 25.1, 0);
+    scene.add( MovingCube );
+
+    // a little bit of scenery...
+    var ambientlight = new THREE.AmbientLight(0x111111);
+    scene.add( ambientlight );
+    var wireMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+    // torus knot
+    var colorMaterial = new THREE.MeshPhongMaterial( { color: 0xff3333 } );
+    var shape = THREE.SceneUtils.createMultiMaterialObject(
+            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 2, 5 ), [ colorMaterial, wireMaterial ] );
+    shape.position.set(-200, 50, -200);
+    scene.add( shape );
+    // torus knot
+    var colorMaterial = new THREE.MeshPhongMaterial( { color: 0x33ff33 } );
+    var shape = THREE.SceneUtils.createMultiMaterialObject(
+            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 2 ), [ colorMaterial, wireMaterial ] );
+    shape.position.set(200, 50, -200);
+    scene.add( shape );
+    // torus knot
+    var colorMaterial = new THREE.MeshPhongMaterial( { color: 0xffff33 } );
+    var shape = THREE.SceneUtils.createMultiMaterialObject(
+            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 4, 3 ), [ colorMaterial, wireMaterial ] );
+    shape.position.set(200, 50, 200);
+    scene.add( shape );
+    // torus knot
+    var colorMaterial = new THREE.MeshPhongMaterial( { color: 0x3333ff } );
+    var shape = THREE.SceneUtils.createMultiMaterialObject(
+            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 4 ), [ colorMaterial, wireMaterial ] );
+    shape.position.set(-200, 50, 200);
+    scene.add( shape );
+
+    // render planes
+    var hex_center_distance = HEX_PANEL_WIDTH / 2 * Math.sqrt(3);
+    var hex_pixel_width = Math.round(Math.sqrt(HEX_NUM_PIXELS * (HEX_PANEL_WIDTH/HEX_PANEL_HEIGHT)));
+    var hex_pixel_height = Math.round(HEX_NUM_PIXELS / hex_pixel_width);
+    console.log(hex_pixel_width, hex_pixel_height, HEX_NUM_PIXELS);
+    for (var j=0; j<6; j++) {
+        hex_cameras[j] = new THREE.PerspectiveCamera( THREE.Math.radToDeg(Math.atan((HEX_PANEL_HEIGHT / 2) / hex_center_distance)) * 2, HEX_PANEL_WIDTH / HEX_PANEL_HEIGHT, NEAR, FAR );
+        scene.add(hex_cameras[j]);
+
+        hex_camera_targets[j] = new THREE.Vector3(0, 0, 0);
+
+        var planeGeometry = new THREE.PlaneGeometry( HEX_PANEL_WIDTH, HEX_PANEL_HEIGHT );
+        hex_render_targets[j] = new THREE.WebGLRenderTarget( hex_pixel_width, hex_pixel_height, { format: THREE.RGBFormat } );
+        var planeMaterial = new THREE.MeshBasicMaterial( { map: hex_render_targets[j], side: THREE.DoubleSide } );
+        hex_planes[j] = new THREE.Mesh( planeGeometry, planeMaterial );
+        hex_planes[j].position.set(hex_center_distance * Math.cos(Math.PI * 2 / 6 * j), 100, hex_center_distance * Math.sin(Math.PI * 2 / 6 * j));
+        hex_planes[j].rotation.y = -(Math.PI * 2 / 6 * j + Math.PI / 2);
+
+        scene.add(hex_planes[j]);
+    }
+
+    // pseudo-border for plane, to make it easier to see
+//    var planeGeometry = new THREE.CubeGeometry( 420, 220, 1, 1 );
+//    var planeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+//    var plane = new THREE.Mesh( planeGeometry, planeMaterial );
+//    plane.position.set(0,100,-502);
+//    scene.add(plane);
+
+}
+
+function animate()
+{
+    requestAnimationFrame( animate );
+
+
+    // hex
+
+    MovingCube.visible = false;
+    for (var j=0; j<6; j++) {
+
+        renderer.render( scene, hex_cameras[j], hex_render_targets[j], true );
+
+        hex_cameras[j].position.copy(MovingCube.position);
+
+        hex_camera_targets[j].copy(MovingCube.position);
+        hex_camera_targets[j].x += Math.cos(Math.PI * 2 / 6 * j);
+        hex_camera_targets[j].z += Math.sin(Math.PI * 2 / 6 * j);
+
+        hex_cameras[j].lookAt( hex_camera_targets[j] );
+    }
+    MovingCube.visible = true;
+
+
+    // render the main scene
+    renderer.render( scene, mainCamera );
+
+
+    // Update Scene
+
+    var delta = clock.getDelta(); // seconds.
+    var moveDistance = 200 * delta; // 200 pixels per second
+    var rotateAngle = Math.PI / 2 * delta;   // pi/2 radians (90 degrees) per second
+
+    // local transformations
+
+    // move forwards/backwards/left/right
+    if ( keyboard.pressed("W") )
+        MovingCube.translateZ( -moveDistance );
+    if ( keyboard.pressed("S") )
+        MovingCube.translateZ(  moveDistance );
+    if ( keyboard.pressed("Q") )
+        MovingCube.translateX( -moveDistance );
+    if ( keyboard.pressed("E") )
+        MovingCube.translateX(  moveDistance );
+
+    // rotate left/right/up/down
+    var rotation_matrix = new THREE.Matrix4().identity();
+    if ( keyboard.pressed("A") )
+        MovingCube.rotateOnAxis( new THREE.Vector3(0,1,0), rotateAngle);
+    if ( keyboard.pressed("D") )
+        MovingCube.rotateOnAxis( new THREE.Vector3(0,1,0), -rotateAngle);
+    if ( keyboard.pressed("R") )
+        MovingCube.rotateOnAxis( new THREE.Vector3(1,0,0), rotateAngle);
+    if ( keyboard.pressed("F") )
+        MovingCube.rotateOnAxis( new THREE.Vector3(1,0,0), -rotateAngle);
+
+    if ( keyboard.pressed("Z") )
+    {
+        MovingCube.position.set(0,25.1,0);
+        MovingCube.rotation.set(0,0,0);
+    }
+
+
+
+    controls.update();
+    stats.update();
+
+
+}
+
+</script>
+
+</body>
 </html>
