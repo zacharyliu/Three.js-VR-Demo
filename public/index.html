@@ -60,7 +60,7 @@ var MovingCube;
 var mainCamera;
 
 // intermediate scene for reflecting the reflection
-var screenScene, screenCamera, firstRenderTarget, finalRenderTarget;
+var screenScene, screenCamera, firstRenderTarget, finalRenderTarget, playerCylinder;
 
 // sizing
 var hex_cameras = [];
@@ -224,11 +224,12 @@ function init()
     player.character.root.scale.set(50, 50, 50);
     player.character.loadWellKnownSkin('3djesus');
 
-    var playerCylinder = new Physijs.CapsuleMesh(new THREE.CylinderGeometry(), new THREE.MeshNormalMaterial());
+    playerCylinder = new Physijs.CapsuleMesh(new THREE.CylinderGeometry(), new THREE.MeshNormalMaterial());
     playerCylinder.add(player.character.root);
     playerCylinder.position.set(0, 200, 0);
     scene.add(playerCylinder);
     playerCylinder.setAngularFactor({x: 0, y: 0, z: 0});
+    playerCylinder.setDamping(0, 0.8);
 
     var loader = new THREE.JSONLoader();
     loader.load( '/Island_001.js', function ( geometry, material ) {
@@ -280,22 +281,32 @@ function animate(nowMsec)
 
     var input = player.controls.input;
     // move forwards/backwards/left/right
+    var angle = (playerCylinder.rotation.x == 0) ? playerCylinder.rotation.y : Math.PI - playerCylinder.rotation.y;
     var velocity = new THREE.Vector3();
-    velocity.copy(MovingCube.getLinearVelocity());
-    if ( keyboard.pressed("W") )
-        velocity.z = -100;
-    if ( keyboard.pressed("S") )
-        velocity.z = 100;
-    if ( keyboard.pressed("Q") )
-        velocity.x = -100;
-    if ( keyboard.pressed("E") )
-        velocity.x = 100;
-    MovingCube.setLinearVelocity(velocity);
+    var velocityX = Math.cos(playerCylinder.rotation.y);
+    velocity.copy(playerCylinder.getLinearVelocity());
+    if ( keyboard.pressed("W") ) {
+        velocity.z = 100 * Math.cos(angle);
+        velocity.x = 100 * Math.sin(angle);
+    }
+    if ( keyboard.pressed("S") ) {
+        velocity.z = -100 * Math.cos(angle);
+        velocity.x = -100 * Math.sin(angle);
+    }
+    if ( keyboard.pressed("E") ) {
+        velocity.z = 100 * Math.cos(angle - Math.PI / 2);
+        velocity.x = 100 * Math.sin(angle - Math.PI / 2);
+    }
+    if ( keyboard.pressed("Q") ) {
+        velocity.z = -100 * Math.cos(angle - Math.PI / 2);
+        velocity.x = -100 * Math.sin(angle - Math.PI / 2);
+    }
+    playerCylinder.setLinearVelocity(velocity);
 
     if (keyboard.pressed("space")) {
         if (!isSpacePressed) {
             console.log("jump");
-            MovingCube.applyCentralImpulse(new THREE.Vector3(1000, -10000, 0));
+            playerCylinder.applyCentralImpulse(new THREE.Vector3(0, 100, 0));
         }
         isSpacePressed = true;
     } else {
@@ -311,23 +322,19 @@ function animate(nowMsec)
 
     // rotate left/right/up/down
     var angularVelocity = new THREE.Vector3();
-    angularVelocity.copy(MovingCube.getAngularVelocity());
+    angularVelocity.copy(playerCylinder.getAngularVelocity());
     if ( keyboard.pressed("A") )
-        angularVelocity.y = 10;
+        angularVelocity.y = 2;
     if ( keyboard.pressed("D") )
-        angularVelocity.y = -10;
-    if ( keyboard.pressed("R") )
-        angularVelocity.x = 10;
-    if ( keyboard.pressed("F") )
-        angularVelocity.x = -10;
-    MovingCube.setAngularVelocity(angularVelocity);
+        angularVelocity.y = -2;
+    playerCylinder.setAngularVelocity(angularVelocity);
 
     if ( keyboard.pressed("Z") )
     {
-        MovingCube.position.set(0,25.1,0);
-        MovingCube.rotation.set(0,0,0);
-        MovingCube.__dirtyPosition = true;
-        MovingCube.__dirtyRotation = true;
+        playerCylinder.position.set(0,25.1,0);
+        playerCylinder.rotation.set(0,0,0);
+        playerCylinder.__dirtyPosition = true;
+        playerCylinder.__dirtyRotation = true;
     }
 
     player.update(delta, nowMsec/1000);
