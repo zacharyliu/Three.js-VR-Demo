@@ -15,7 +15,7 @@
 </head>
 <body>
 
-<script src="/js/three/Three.js"></script>
+<script src="/js/three/three.67.js"></script>
 <script src="/js/three/Detector.js"></script>
 <script src="/js/three/Stats.js"></script>
 <script src="/js/three/OrbitControls.js"></script>
@@ -23,6 +23,16 @@
 <script src="/js/three/THREEx.KeyboardState.js"></script>
 <script src="/js/three/THREEx.FullScreen.js"></script>
 <script src="/js/three/THREEx.WindowResize.js"></script>
+<script src="/threex.minecraft/threex.minecraft.js"></script>
+<script src="/threex.minecraft/threex.minecraftcontrols.js"></script>
+<script src="/threex.minecraft/threex.animation.js"></script>
+<script src="/threex.minecraft/threex.animations.js"></script>
+<script src="/threex.minecraft/threex.minecraftcharheadanim.js"></script>
+<script src="/threex.minecraft/threex.minecraftcharbodyanim.js"></script>
+<script src="/threex.minecraft/threex.minecraftplayer.js"></script>
+<script src="/js/three/loaders/MTLLoader.js"></script>
+<script src="/js/three/loaders/OBJMTLLoader.js"></script>
+
 
 <!-- ------------------------------------------------------------ -->
 
@@ -37,7 +47,7 @@
 // MAIN
 
 // standard global variables
-var container, scene, renderer, controls, stats;
+var container, scene, renderer, controls, stats, player;
 var keyboard = new THREEx.KeyboardState();
 var clock = new THREE.Clock();
 
@@ -59,7 +69,7 @@ var HEX_PANEL_WIDTH = 6 * 30;
 var HEX_NUM_PIXELS = 1024 * 1024;
 
 init();
-animate();
+requestAnimationFrame(animate);
 
 // FUNCTIONS
 function init()
@@ -207,9 +217,24 @@ function init()
 //    plane.position.set(0,100,-502);
 //    scene.add(plane);
 
+    THREEx.MinecraftChar.baseUrl = "/threex.minecraft/";
+    player = new THREEx.MinecraftPlayer();
+    scene.add(player.character.root);
+    player.character.root.position.set(0, 100, 0);
+    player.character.root.scale.set(50, 50, 50);
+    player.character.loadWellKnownSkin('3djesus');
+
+    var loader = new THREE.OBJMTLLoader();
+    loader.load( '/Island_001.obj', '/Island_001.mtl', function ( object ) {
+
+        object.position.y = - 80;
+        scene.add( object );
+
+    } );
+
 }
 
-function animate()
+function animate(nowMsec)
 {
     requestAnimationFrame( animate );
 
@@ -244,6 +269,7 @@ function animate()
 
     // local transformations
 
+    var input = player.controls.input;
     // move forwards/backwards/left/right
     if ( keyboard.pressed("W") )
         MovingCube.translateZ( -moveDistance );
@@ -253,6 +279,13 @@ function animate()
         MovingCube.translateX( -moveDistance );
     if ( keyboard.pressed("E") )
         MovingCube.translateX(  moveDistance );
+
+    input.up = keyboard.pressed("W");
+    input.down = keyboard.pressed("S");
+    input.left = keyboard.pressed("A");
+    input.right = keyboard.pressed("D");
+    input.strafeLeft = keyboard.pressed("Q");
+    input.strafeRight = keyboard.pressed("E");
 
     // rotate left/right/up/down
     var rotation_matrix = new THREE.Matrix4().identity();
@@ -271,7 +304,7 @@ function animate()
         MovingCube.rotation.set(0,0,0);
     }
 
-
+    player.update(delta, nowMsec/1000);
 
     controls.update();
     stats.update();
