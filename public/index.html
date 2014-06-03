@@ -129,7 +129,7 @@ function init()
     var floor = new Physijs.BoxMesh(floorGeometry, floorMaterial, 0);
     floor.position.y = -0.5;
     floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
+//    scene.add(floor);
     // SKYBOX/FOG
     var materialArray = [];
     materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/dawnmountain-xpos.png' ) }));
@@ -142,7 +142,7 @@ function init()
         materialArray[i].side = THREE.BackSide;
     var skyboxMaterial = new THREE.MeshFaceMaterial( materialArray );
 
-    var skyboxGeom = new THREE.CubeGeometry( 2000, 2000, 2000, 1, 1, 1 );
+    var skyboxGeom = new THREE.CubeGeometry( 5000, 5000, 5000, 1, 1, 1 );
 
     var skybox = new THREE.Mesh( skyboxGeom, skyboxMaterial );
     scene.add( skybox );
@@ -230,15 +230,18 @@ function init()
     scene.add(playerCylinder);
     playerCylinder.setAngularFactor({x: 0, y: 0, z: 0});
 
-//    var loader = new THREE.OBJMTLLoader();
-//    loader.load( '/Island_001.obj', '/Island_001.mtl', function ( object ) {
-//
-//        object.position.y = - 80;
-//        scene.add( object );
-//
-//    } );
+    var loader = new THREE.JSONLoader();
+    loader.load( '/Island_001.js', function ( geometry, material ) {
 
+        var object = new Physijs.BoxMesh(geometry, new THREE.MeshNormalMaterial(), 0);
+        object.position.y = -500;
+        object.scale.set(10, 10, 10);
+        scene.add( object );
+
+    } );
 }
+
+var isSpacePressed = false;
 
 function animate(nowMsec)
 {
@@ -287,8 +290,17 @@ function animate(nowMsec)
         velocity.x = -100;
     if ( keyboard.pressed("E") )
         velocity.x = 100;
-    console.log(velocity);
     MovingCube.setLinearVelocity(velocity);
+
+    if (keyboard.pressed("space")) {
+        if (!isSpacePressed) {
+            console.log("jump");
+            MovingCube.applyCentralImpulse(new THREE.Vector3(1000, -10000, 0));
+        }
+        isSpacePressed = true;
+    } else {
+        isSpacePressed = false;
+    }
 
     input.up = keyboard.pressed("W");
     input.down = keyboard.pressed("S");

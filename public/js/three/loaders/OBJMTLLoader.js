@@ -93,7 +93,7 @@ THREE.OBJMTLLoader.prototype = {
 				object.add( mesh );
 
 				geometry = new THREE.Geometry();
-				mesh = new THREE.Mesh( geometry, material );
+				mesh = new Physijs.ConvexMesh( geometry, material, 0 );
 				verticesCount = 0;
 
 			}
@@ -116,7 +116,7 @@ THREE.OBJMTLLoader.prototype = {
 
 		var geometry = new THREE.Geometry();
 		var material = new THREE.MeshLambertMaterial();
-		var mesh = new THREE.Mesh( geometry, material );
+		var mesh = new Physijs.ConvexMesh( geometry, material, 0 );
 
 		var vertices = [];
 		var verticesCount = 0;
