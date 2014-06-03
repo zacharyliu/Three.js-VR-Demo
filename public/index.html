@@ -251,20 +251,20 @@ function animate(nowMsec)
 
     // hex
 
-    MovingCube.visible = false;
+    playerCylinder.visible = false;
     for (var j=0; j<6; j++) {
 
         renderer.render( scene, hex_cameras[j], hex_render_targets[j], true );
 
-        hex_cameras[j].position.copy(MovingCube.position);
+        hex_cameras[j].position.copy(playerCylinder.position);
 
-        hex_camera_targets[j].copy(MovingCube.position);
+        hex_camera_targets[j].copy(playerCylinder.position);
         hex_camera_targets[j].x += Math.cos(Math.PI * 2 / 6 * j);
         hex_camera_targets[j].z += Math.sin(Math.PI * 2 / 6 * j);
 
         hex_cameras[j].lookAt( hex_camera_targets[j] );
     }
-    MovingCube.visible = true;
+    playerCylinder.visible = true;
 
 
     // render the main scene
