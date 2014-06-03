@@ -32,12 +32,16 @@
 <script src="/threex.minecraft/threex.minecraftplayer.js"></script>
 <script src="/js/three/loaders/MTLLoader.js"></script>
 <script src="/js/three/loaders/OBJMTLLoader.js"></script>
+<script src="/js/physijs/physi.js"></script>
 
 
 <!-- ------------------------------------------------------------ -->
 
 <div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
 <script>
+Physijs.scripts.worker = "/js/physijs/physijs_worker.js";
+Physijs.scripts.ammo = "/js/physijs/examples/js/ammo.js";
+
 /*
  Three.js "tutorials by example"
  Author: Lee Stemkoski
@@ -75,7 +79,8 @@ requestAnimationFrame(animate);
 function init()
 {
     // SCENE
-    scene = new THREE.Scene();
+    scene = new Physijs.Scene();
+    scene.setGravity(new THREE.Vector3( 0, -30*30, 0 ));
 
     // CAMERAS
     var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
@@ -121,7 +126,7 @@ function init()
     floorTexture.repeat.set( 10, 10 );
     var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.FrontSide } );
     var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
-    var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    var floor = new Physijs.BoxMesh(floorGeometry, floorMaterial, 0);
     floor.position.y = -0.5;
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
@@ -137,7 +142,7 @@ function init()
         materialArray[i].side = THREE.BackSide;
     var skyboxMaterial = new THREE.MeshFaceMaterial( materialArray );
 
-    var skyboxGeom = new THREE.CubeGeometry( 5000, 5000, 5000, 1, 1, 1 );
+    var skyboxGeom = new THREE.CubeGeometry( 2000, 2000, 2000, 1, 1, 1 );
 
     var skybox = new THREE.Mesh( skyboxGeom, skyboxMaterial );
     scene.add( skybox );
@@ -156,9 +161,10 @@ function init()
     cubeMaterialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'images/zneg.png' ) }));
     var MovingCubeMat = new THREE.MeshFaceMaterial(cubeMaterialArray);
     var MovingCubeGeom = new THREE.CubeGeometry( 50, 50, 50, 1, 1, 1, cubeMaterialArray );
-    MovingCube = new THREE.Mesh( MovingCubeGeom, MovingCubeMat );
+    MovingCube = new Physijs.BoxMesh( MovingCubeGeom, MovingCubeMat );
     MovingCube.position.set(0, 25.1, 0);
     scene.add( MovingCube );
+    MovingCube.setLinearVelocity(new THREE.Vector3(-200, 50, -200));
 
     // a little bit of scenery...
     var ambientlight = new THREE.AmbientLight(0x111111);
@@ -166,31 +172,27 @@ function init()
     var wireMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
     // torus knot
     var colorMaterial = new THREE.MeshPhongMaterial( { color: 0xff3333 } );
-    var shape = THREE.SceneUtils.createMultiMaterialObject(
-            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 2, 5 ), [ colorMaterial, wireMaterial ] );
+    var shape = new Physijs.SphereMesh( new THREE.SphereGeometry(50, 50, 50), new THREE.MeshNormalMaterial() );
     shape.position.set(-200, 50, -200);
     scene.add( shape );
     // torus knot
     var colorMaterial = new THREE.MeshPhongMaterial( { color: 0x33ff33 } );
-    var shape = THREE.SceneUtils.createMultiMaterialObject(
-            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 2 ), [ colorMaterial, wireMaterial ] );
+    var shape = new Physijs.ConvexMesh(new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 2 ), colorMaterial );
     shape.position.set(200, 50, -200);
     scene.add( shape );
     // torus knot
     var colorMaterial = new THREE.MeshPhongMaterial( { color: 0xffff33 } );
-    var shape = THREE.SceneUtils.createMultiMaterialObject(
-            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 4, 3 ), [ colorMaterial, wireMaterial ] );
+    var shape = new Physijs.ConvexMesh(new THREE.TorusKnotGeometry( 30, 6, 160, 10, 4, 3 ), colorMaterial );
     shape.position.set(200, 50, 200);
     scene.add( shape );
     // torus knot
     var colorMaterial = new THREE.MeshPhongMaterial( { color: 0x3333ff } );
-    var shape = THREE.SceneUtils.createMultiMaterialObject(
-            new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 4 ), [ colorMaterial, wireMaterial ] );
+    var shape = new Physijs.ConvexMesh(new THREE.TorusKnotGeometry( 30, 6, 160, 10, 3, 4 ), colorMaterial );
     shape.position.set(-200, 50, 200);
     scene.add( shape );
 
     // render planes
-    var hex_center_distance = HEX_PANEL_WIDTH / 2 * Math.sqrt(3);
+    var hex_center_distance = HEX_PANEL_WIDTH / 2 * Math.sqrt(3) * 1.1;
     var hex_pixel_width = Math.round(Math.sqrt(HEX_NUM_PIXELS * (HEX_PANEL_WIDTH/HEX_PANEL_HEIGHT)));
     var hex_pixel_height = Math.round(HEX_NUM_PIXELS / hex_pixel_width);
     console.log(hex_pixel_width, hex_pixel_height, HEX_NUM_PIXELS);
@@ -203,8 +205,8 @@ function init()
         var planeGeometry = new THREE.PlaneGeometry( HEX_PANEL_WIDTH, HEX_PANEL_HEIGHT );
         hex_render_targets[j] = new THREE.WebGLRenderTarget( hex_pixel_width, hex_pixel_height, { format: THREE.RGBFormat } );
         var planeMaterial = new THREE.MeshBasicMaterial( { map: hex_render_targets[j], side: THREE.DoubleSide } );
-        hex_planes[j] = new THREE.Mesh( planeGeometry, planeMaterial );
-        hex_planes[j].position.set(hex_center_distance * Math.cos(Math.PI * 2 / 6 * j), 100, hex_center_distance * Math.sin(Math.PI * 2 / 6 * j));
+        hex_planes[j] = new Physijs.BoxMesh( planeGeometry, planeMaterial, 10 );
+        hex_planes[j].position.set(hex_center_distance * Math.cos(Math.PI * 2 / 6 * j), 100*1.5, hex_center_distance * Math.sin(Math.PI * 2 / 6 * j));
         hex_planes[j].rotation.y = -(Math.PI * 2 / 6 * j + Math.PI / 2);
 
         scene.add(hex_planes[j]);
@@ -219,18 +221,22 @@ function init()
 
     THREEx.MinecraftChar.baseUrl = "/threex.minecraft/";
     player = new THREEx.MinecraftPlayer();
-    scene.add(player.character.root);
-    player.character.root.position.set(0, 100, 0);
     player.character.root.scale.set(50, 50, 50);
     player.character.loadWellKnownSkin('3djesus');
 
-    var loader = new THREE.OBJMTLLoader();
-    loader.load( '/Island_001.obj', '/Island_001.mtl', function ( object ) {
+    var playerCylinder = new Physijs.CapsuleMesh(new THREE.CylinderGeometry(), new THREE.MeshNormalMaterial());
+    playerCylinder.add(player.character.root);
+    playerCylinder.position.set(0, 200, 0);
+    scene.add(playerCylinder);
+    playerCylinder.setAngularFactor({x: 0, y: 0, z: 0});
 
-        object.position.y = - 80;
-        scene.add( object );
-
-    } );
+//    var loader = new THREE.OBJMTLLoader();
+//    loader.load( '/Island_001.obj', '/Island_001.mtl', function ( object ) {
+//
+//        object.position.y = - 80;
+//        scene.add( object );
+//
+//    } );
 
 }
 
@@ -264,21 +270,25 @@ function animate(nowMsec)
     // Update Scene
 
     var delta = clock.getDelta(); // seconds.
-    var moveDistance = 200 * delta; // 200 pixels per second
+    var moveDistance = 200 * delta * 10; // 200 pixels per second
     var rotateAngle = Math.PI / 2 * delta;   // pi/2 radians (90 degrees) per second
 
     // local transformations
 
     var input = player.controls.input;
     // move forwards/backwards/left/right
+    var velocity = new THREE.Vector3();
+    velocity.copy(MovingCube.getLinearVelocity());
     if ( keyboard.pressed("W") )
-        MovingCube.translateZ( -moveDistance );
+        velocity.z = -100;
     if ( keyboard.pressed("S") )
-        MovingCube.translateZ(  moveDistance );
+        velocity.z = 100;
     if ( keyboard.pressed("Q") )
-        MovingCube.translateX( -moveDistance );
+        velocity.x = -100;
     if ( keyboard.pressed("E") )
-        MovingCube.translateX(  moveDistance );
+        velocity.x = 100;
+    console.log(velocity);
+    MovingCube.setLinearVelocity(velocity);
 
     input.up = keyboard.pressed("W");
     input.down = keyboard.pressed("S");
@@ -288,20 +298,24 @@ function animate(nowMsec)
     input.strafeRight = keyboard.pressed("E");
 
     // rotate left/right/up/down
-    var rotation_matrix = new THREE.Matrix4().identity();
+    var angularVelocity = new THREE.Vector3();
+    angularVelocity.copy(MovingCube.getAngularVelocity());
     if ( keyboard.pressed("A") )
-        MovingCube.rotateOnAxis( new THREE.Vector3(0,1,0), rotateAngle);
+        angularVelocity.y = 10;
     if ( keyboard.pressed("D") )
-        MovingCube.rotateOnAxis( new THREE.Vector3(0,1,0), -rotateAngle);
+        angularVelocity.y = -10;
     if ( keyboard.pressed("R") )
-        MovingCube.rotateOnAxis( new THREE.Vector3(1,0,0), rotateAngle);
+        angularVelocity.x = 10;
     if ( keyboard.pressed("F") )
-        MovingCube.rotateOnAxis( new THREE.Vector3(1,0,0), -rotateAngle);
+        angularVelocity.x = -10;
+    MovingCube.setAngularVelocity(angularVelocity);
 
     if ( keyboard.pressed("Z") )
     {
         MovingCube.position.set(0,25.1,0);
         MovingCube.rotation.set(0,0,0);
+        MovingCube.__dirtyPosition = true;
+        MovingCube.__dirtyRotation = true;
     }
 
     player.update(delta, nowMsec/1000);
@@ -309,7 +323,7 @@ function animate(nowMsec)
     controls.update();
     stats.update();
 
-
+    scene.simulate();
 }
 
 </script>
